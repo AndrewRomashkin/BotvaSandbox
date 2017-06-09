@@ -12,7 +12,6 @@ namespace BotvaSandbox
 {
     public partial class Form1 : Form
     {
-
         #region Shapes
         static readonly Shape stronghold = new Shape("Крепость", new byte[][] {
             new byte[] { 1, 1, 1, 1, 1, 1, 1, 1 },
@@ -222,8 +221,6 @@ namespace BotvaSandbox
         });
         #endregion Shapes
 
-        bool stop = false;
-        bool running = false;
         List<Shape> result = new List<Shape>();
         int totalDistance = 0;
         Shape[] allShapes = new Shape[] { stronghold, chess, mushroom, heart, botva, pig, dino, ram, hammer, strawHat, tooBigRobot, shanny, ushkanchik, hellpoker, booze, scratchy, fregate, soapStone, kryackchepechkasFriend, whale };
@@ -241,6 +238,8 @@ namespace BotvaSandbox
 
         private void button1_Click(object sender, EventArgs e)
         {
+            int createCost = int.Parse(textBox1.Text);
+            int destroyCost = int.Parse(textBox2.Text);
             result = new List<Shape>();
             totalDistance = 0;
             foreach (Shape shape in allShapes)
@@ -251,33 +250,60 @@ namespace BotvaSandbox
                 int minDistance = 99999999;
                 Shape nextShape = heart;
                 foreach (Shape shape in allShapes)
-                    if ((!result.Contains(shape)) && (shape.Distance(result[result.Count - 1]) < minDistance))
+                    if ((!result.Contains(shape)) && (result[result.Count - 1].Distance(shape, createCost, destroyCost) < minDistance))
                     {
                         nextShape = shape;
-                        minDistance = shape.Distance(result[result.Count - 1]);
+                        minDistance = result[result.Count - 1].Distance(shape, createCost, destroyCost);
                     }
                 result.Add(nextShape);
                 totalDistance += minDistance;
             }
-          
+
+            Random rnd = new Random();
+            bool stop = false;
+            while (!stop)
+            {
+                stop = true;
+                for (int i = 1; i < 19; i++)
+                    for (int j = i + 1; j < 20; j++)
+                    {
+                        Shape buf = result[i];
+                        result[i] = result[j];
+                        result[j] = buf;
+
+                        int newDistance = 0;
+                        for (int k = 1; k < 20; k++)
+                            newDistance += result[k - 1].Distance(result[k], createCost, destroyCost);
+
+                        if (newDistance < totalDistance)
+                        {
+                            totalDistance = newDistance;
+                            stop = false;
+                        }
+                        else
+                        {
+                            buf = result[i];
+                            result[i] = result[j];
+                            result[j] = buf;
+                        }
+                    }
+
+            }
+
             richTextBox1.AppendText(GetResultString());
+            richTextBox1.SelectionStart = richTextBox1.Text.Length;
+            richTextBox1.ScrollToCaret();
         }
 
         private string GetResultString()
         {
             string resultString;
-            int distanceToDisplay;
-            resultString = "Лучшая последовательность: ";
+            resultString = "Лучшая последовательность:\n";
             for (int i = 0; i < 20; i++)
             {
-                resultString += result[i].Name + ((i != 19) ? (", ") : (""));
+                resultString += (i+1).ToString() + ". " + result[i].Name + "\n";
             }
-            distanceToDisplay = totalDistance;
-            for (int i = 0; i < 8; i++)
-                for (int j = 0; j < 8; j++)
-                    if (result[0].Field[i][j] == 1)
-                        distanceToDisplay++;
-            resultString += "\n" + "Всего куличиков: " + distanceToDisplay.ToString() + "\n";
+            resultString += "\n" + "Требуется энергии: " + totalDistance.ToString() + "\n\n\n";
             return resultString;
         }
 
@@ -292,13 +318,17 @@ namespace BotvaSandbox
                 this.Field = Field;
             }
 
-            public int Distance(Shape to)
+            public int Distance(Shape to, int createCost, int destroyCost)
             {
                 int result = 0;
                 for (int i = 0; i < 8; i++)
                     for (int j = 0; j < 8; j++)
-                        if (Field[i][j] != to.Field[i][j])
-                            result++;
+                    {
+                        if (Field[i][j] < to.Field[i][j])
+                            result += createCost;
+                        if (Field[i][j] > to.Field[i][j])
+                            result += destroyCost;
+                    }
                 return result;
             }
 
@@ -306,66 +336,6 @@ namespace BotvaSandbox
             {
                 return Name;
             }
-        }
-
-        private void button2_Click(object sender, EventArgs e)
-        {
-            if (result.Count != 20)
-                return;
-            if (!running)
-            {
-                stop = false;
-                running = true;
-                bw.DoWork += Bw_DoWork;
-                bw.RunWorkerAsync();
-                button2.Text = "Стоп";
-                button1.Enabled = false;
-            }
-            else
-            {
-                stop = true;
-                running = false;
-            }
-        }
-
-        private void Bw_DoWork(object sender, DoWorkEventArgs e)
-        {
-            Random rnd = new Random();
-            while (!stop)
-            {
-                int first = rnd.Next(19) + 1;
-                int second = rnd.Next(19) + 1;
-                while (first == second)
-                    second = rnd.Next(19) + 1;
-                Shape buf = result[first];
-                result[first] = result[second];
-                result[second] = buf;
-
-                int newDistance = 0;
-                for (int i = 1; i < 20; i++)
-                    newDistance += result[i].Distance(result[i - 1]);
-
-                if (newDistance < totalDistance)
-                {
-                    totalDistance = newDistance;
-                    string resultString = GetResultString();
-                    richTextBox1.BeginInvoke((Action)(() => {
-                        richTextBox1.AppendText("\n\nНайдено новое решение: \n" + resultString);
-                        richTextBox1.SelectionStart = richTextBox1.Text.Length;
-                        richTextBox1.ScrollToCaret();
-                    }));
-                }
-                else
-                {
-                    buf = result[first];
-                    result[first] = result[second];
-                    result[second] = buf;
-                }
-            }
-            richTextBox1.BeginInvoke((Action)(() => {
-                button2.Text = "Итеративное улучшение";
-                button1.Enabled = true;
-            }));
         }
     }
 }
