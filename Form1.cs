@@ -219,11 +219,22 @@ namespace BotvaSandbox
             new byte[] { 1, 0, 0, 0, 0, 1, 0, 0 },
             new byte[] { 0, 1, 1, 1, 1, 0, 0, 0 }
         });
+        static readonly Shape empty = new Shape("Пусто", new byte[][] {
+            new byte[] { 0, 0, 0, 0, 0, 0, 0, 0 },
+            new byte[] { 0, 0, 0, 0, 0, 0, 0, 0 },
+            new byte[] { 0, 0, 0, 0, 0, 0, 0, 0 },
+            new byte[] { 0, 0, 0, 0, 0, 0, 0, 0 },
+            new byte[] { 0, 0, 0, 0, 0, 0, 0, 0 },
+            new byte[] { 0, 0, 0, 0, 0, 0, 0, 0 },
+            new byte[] { 0, 0, 0, 0, 0, 0, 0, 0 },
+            new byte[] { 0, 0, 0, 0, 0, 0, 0, 0 }
+        });
         #endregion Shapes
 
         List<Shape> result = new List<Shape>();
         int totalDistance = 0;
-        Shape[] allShapes = new Shape[] { stronghold, chess, mushroom, heart, botva, pig, dino, ram, hammer, strawHat, tooBigRobot, shanny, ushkanchik, hellpoker, booze, scratchy, fregate, soapStone, kryackchepechkasFriend, whale };
+        Shape[] allShapes = new Shape[] { empty, stronghold, chess, mushroom, heart, botva, pig, dino, ram, hammer, strawHat, tooBigRobot, shanny, ushkanchik, hellpoker, booze, scratchy, fregate, soapStone, kryackchepechkasFriend, whale };
+        CheckBox[] allCheckboxes;
         BackgroundWorker bw = new BackgroundWorker();
 
         public Form1()
@@ -233,6 +244,10 @@ namespace BotvaSandbox
 
         private void Form1_Load(object sender, EventArgs e)
         {
+            allCheckboxes = new CheckBox[] { checkBox1, checkBox2, checkBox3, checkBox4, checkBox5, checkBox6, checkBox7, checkBox8, checkBox9, checkBox10, checkBox11, checkBox12, checkBox13, checkBox14, checkBox15, checkBox16, checkBox17, checkBox18, checkBox19, checkBox20 };
+
+            foreach (Shape shape in allShapes)
+                comboBox1.Items.Add(shape.Name);
             comboBox1.SelectedIndex = 0;
         }
 
@@ -240,12 +255,19 @@ namespace BotvaSandbox
         {
             int createCost = int.Parse(textBox1.Text);
             int destroyCost = int.Parse(textBox2.Text);
+            int min = 999999999;
             result = new List<Shape>();
+            result.Add(empty);
+            foreach (CheckBox checkBox in allCheckboxes)
+                if (checkBox.Checked && checkBox.Text != comboBox1.Text)
+                    result.Add(GetShapeByName(checkBox.Text));
+            if (comboBox1.Text != empty.Name)
+                result.Add(GetShapeByName(comboBox1.Text));
+            int fixedShapeCount = result.Count;
             totalDistance = 0;
-            foreach (Shape shape in allShapes)
-                if (shape.Name == comboBox1.Text)
-                    result.Add(shape);
-            while (result.Count < 20)
+            for (int i = 1; i < fixedShapeCount; i++)
+                totalDistance += result[i - 1].Distance(result[i], createCost, destroyCost);
+            while (result.Count < 21)
             {
                 int minDistance = 99999999;
                 Shape nextShape = heart;
@@ -264,15 +286,15 @@ namespace BotvaSandbox
             while (!stop)
             {
                 stop = true;
-                for (int i = 1; i < 19; i++)
-                    for (int j = i + 1; j < 20; j++)
+                for (int i = fixedShapeCount; i < 21; i++)
+                    for (int j = i + 1; j < 21; j++)
                     {
                         Shape buf = result[i];
                         result[i] = result[j];
                         result[j] = buf;
 
                         int newDistance = 0;
-                        for (int k = 1; k < 20; k++)
+                        for (int k = 1; k < 21; k++)
                             newDistance += result[k - 1].Distance(result[k], createCost, destroyCost);
 
                         if (newDistance < totalDistance)
@@ -287,24 +309,36 @@ namespace BotvaSandbox
                             result[j] = buf;
                         }
                     }
-
             }
 
-            richTextBox1.AppendText(GetResultString());
+            if (totalDistance < min)
+                min = totalDistance;
+
+            richTextBox1.AppendText(GetResultString(fixedShapeCount, createCost, destroyCost));
             richTextBox1.SelectionStart = richTextBox1.Text.Length;
             richTextBox1.ScrollToCaret();
         }
 
-        private string GetResultString()
+        private string GetResultString(int fixedShapeCount, int createCost, int destroyCost)
         {
             string resultString;
             resultString = "Лучшая последовательность:\n";
-            for (int i = 0; i < 20; i++)
+            int totalDistance = 0;
+            for (int i = fixedShapeCount; i < 21; i++)
             {
-                resultString += (i+1).ToString() + ". " + result[i].Name + "\n";
+                totalDistance += result[i - 1].Distance(result[i], createCost, destroyCost);
+                resultString += (i - fixedShapeCount + 1).ToString() + ". " + result[i].Name + "\n";
             }
             resultString += "\n" + "Требуется энергии: " + totalDistance.ToString() + "\n\n\n";
             return resultString;
+        }
+
+        Shape GetShapeByName(string name)
+        {
+            foreach (Shape shape in allShapes)
+                if (shape.Name == name)
+                    return shape;
+            return null;
         }
 
         class Shape
